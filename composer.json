@@ -14,7 +14,8 @@
         "ext-bcmath": "*"
     },
     "require-dev": {
-        "phpunit/phpunit": "3.7.*"
+        "phpunit/phpunit": "3.7.*",
+	"squizlabs/php_codesniffer": "1.*"
     },
     "suggest": {
         "ext-sockets": "Use AMQPSocketConnection"

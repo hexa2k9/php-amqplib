@@ -1,5 +1,7 @@
 test:
 	vendor/bin/phpunit
+phpcs:
+	vendor/bin/phpcs --standard=PSR2 PhpAmqpLib
 .PHONY: benchmark
 benchmark:
 	@echo "Publishing 4000 msgs with 1KB of content:"
