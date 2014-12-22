@@ -1,5 +1,4 @@
 <?php
-
 namespace PhpAmqpLib\Wire;
 
 use PhpAmqpLib\Channel\AMQPChannel;
@@ -10,36 +9,29 @@ use PhpAmqpLib\Channel\AMQPChannel;
  */
 abstract class GenericContent
 {
-
-    /**
-     * @var array|AMQPChannel[]
-     */
+    /** @var AMQPChannel[] */
     public $delivery_info = array();
 
-    /**
-     * @var array
-     */
+    /** @var array Final property definitions */
     protected $prop_types;
 
-    /**
-     * @var array
-     */
+    /** @var array Properties content */
     private $properties = array();
 
-    /**
-     * @var null
-     */
-    private $serialized_properties = null;
+    /** @var string Compiled properties */
+    private $serialized_properties;
 
     /**
      * @var array
      */
     protected static $PROPERTIES = array(
-        "dummy" => "shortstr"
+        'dummy' => 'shortstr'
     );
 
-
-
+    /**
+     * @param $props
+     * @param null $prop_types
+     */
     public function __construct($props, $prop_types = null)
     {
         if ($prop_types) {
@@ -53,23 +45,24 @@ abstract class GenericContent
         }
     }
 
-
-
     /**
      * Check whether a property exists in the 'properties' dictionary
      * or if present - in the 'delivery_info' dictionary.
+     *
+     * @param string $name
+     * @return bool
      */
     public function has($name)
     {
         return isset($this->properties[$name]) || isset($this->delivery_info[$name]);
     }
 
-
-
     /**
      * Look for additional properties in the 'properties' dictionary,
      * and if present - the 'delivery_info' dictionary.
      *
+     * @param string $name
+     * @throws \OutOfBoundsException
      * @return mixed|AMQPChannel
      */
     public function get($name)
@@ -77,38 +70,45 @@ abstract class GenericContent
         if (isset($this->properties[$name])) {
             return $this->properties[$name];
         }
+
         if (isset($this->delivery_info[$name])) {
             return $this->delivery_info[$name];
         }
 
-        throw new \OutOfBoundsException("No '$name' property");
+        throw new \OutOfBoundsException(sprintf(
+            'No "%s" property',
+            $name
+        ));
     }
 
-
-
     /**
-     * just return the $this::properties array.
+     * Returns the properties content
+     *
+     * @return array
      */
     public function get_properties()
     {
         return $this->properties;
     }
 
-
-
     /**
-     * allows to set the property after creation of the object
+     * Sets a property value
+     *
+     * @param string $name The property name (one of the property definition)
+     * @param mixed $value The property value
+     * @throws \OutOfBoundsException
      */
     public function set($name, $value)
     {
         if (!array_key_exists($name, $this->prop_types)) {
-            throw new \OutOfBoundsException("No '$name' property");
+            throw new \OutOfBoundsException(sprintf(
+                'No "%s" property',
+                $name
+            ));
         }
 
         $this->properties[$name] = $value;
     }
-
-
 
     /**
      * Given the raw bytes containing the property-flags and
@@ -117,7 +117,7 @@ abstract class GenericContent
      * 'properties'.
      *
      * @param AMQPReader $r
-     * NOTE: do not mutate $r
+     * NOTE: do not mutate $reader
      */
     public function load_properties($r)
     {
@@ -151,11 +151,13 @@ abstract class GenericContent
     }
 
 
-
     /**
-     * serialize the 'properties' attribute (a dictionary) into the
+     * Serializes the 'properties' attribute (a dictionary) into the
      * raw bytes making up a set of property flags and a property
      * list, suitable for putting into a content frame header.
+     *
+     * @return string
+     * @todo Inject the AMQPWriter to make the method easier to test
      */
     public function serialize_properties()
     {
@@ -169,25 +171,26 @@ abstract class GenericContent
         $raw_bytes = new AMQPWriter();
 
         foreach ($this->prop_types as $key => $prototype) {
-            if (isset($this->properties[$key])) {
-                $val = $this->properties[$key];
-            } else {
-                $val = null;
+            $val = isset($this->properties[$key]) ? $this->properties[$key] : null;
+
+            // Very important: PHP type eval is weak, use the === to test the
+            // value content. Zero or false value should not be removed
+            if ($val === null) {
+                $shift -= 1;
+                continue;
             }
 
-            if ($val != null) {
-                if ($shift == 0) {
-                    $flags[] = $flag_bits;
-                    $flag_bits = 0;
-                    $shift = 15;
-                }
-
-                $flag_bits |= (1 << $shift);
-                if ($prototype != "bit") {
-                    $raw_bytes->{'write_' . $prototype}($val);
-                }
-
+            if ($shift === 0) {
+                $flags[] = $flag_bits;
+                $flag_bits = 0;
+                $shift = 15;
             }
+
+            $flag_bits |= (1 << $shift);
+            if ($prototype != 'bit') {
+                $raw_bytes->{'write_' . $prototype}($val);
+            }
+
             $shift -= 1;
         }
 
